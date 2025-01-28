@@ -1,75 +1,116 @@
-# Get user input for instruction percentages
-$ALU_Percentage = Read-Host "Enter percentage of ALU instructions"
-$LoadStore_Percentage = Read-Host "Enter percentage of Load/Store instructions"
-$Branch_Percentage = Read-Host "Enter percentage of Branch instructions"
-
-# Convert input strings to integers
-$ALU_Percentage = [int]$ALU_Percentage
-$LoadStore_Percentage = [int]$LoadStore_Percentage
-$Branch_Percentage = [int]$Branch_Percentage
-
-# Validate input percentages
-if (($ALU_Percentage -le 0) -or ($LoadStore_Percentage -le 0) -or ($Branch_Percentage -le 0)) {
-    Write-Host "Error: Percentages must be greater than 0."
-    exit
-}
-
-if (($ALU_Percentage + $LoadStore_Percentage + $Branch_Percentage) -ne 100) {
-    Write-Host "Error: Percentages must add up to 100."
-    exit
-}
-
-# Get user input for cycles (CPI) - Validate and provide guidance
-$ALU_Cycles = Read-Host "Enter number of cycles for ALU instructions (CPI - recommended range: 1-10)"
-$LoadStore_Cycles = Read-Host "Enter number of cycles for Load/Store instructions (CPI - recommended range: 1-10)"
-$Branch_Cycles = Read-Host "Enter number of cycles for Branch instructions (CPI - recommended range: 1-10)"
-
-# Assume 1 million instructions for calculation
-$Total_Instructions = [Decimal]1000000 
-
-# Calculate number of instructions for each type
-$ALU_Instructions = [Decimal]::Round($Total_Instructions * ($ALU_Percentage / 100))
-$LoadStore_Instructions = [Decimal]::Round($Total_Instructions * ($LoadStore_Percentage / 100))
-$Branch_Instructions = [Decimal]::Round($Total_Instructions * ($Branch_Percentage / 100))
-
-try {
-    # Calculate partial cycle counts using Decimal
-    $ALU_Cycle_Count = [Decimal]$ALU_Cycles * $ALU_Instructions
-    $LoadStore_Cycle_Count = [Decimal]$LoadStore_Cycles * $LoadStore_Instructions
-    $Branch_Cycle_Count = [Decimal]$Branch_Cycles * $Branch_Instructions
-
-    # Check if any partial cycle count exceeds Decimal range
-    if ($ALU_Cycle_Count -gt [Decimal]7.9e28 -or $LoadStore_Cycle_Count -gt [Decimal]7.9e28 -or $Branch_Cycle_Count -gt [Decimal]7.9e28) {
-        Write-Warning "Warning: Some calculations might exceed the Decimal range."
-        Write-Warning "Using BigInteger for more precise calculations."
-
-        # Use BigInteger only if necessary
-        $ALU_Cycle_Count = [BigInteger]$ALU_Cycles * [BigInteger]$ALU_Instructions
-        $LoadStore_Cycle_Count = [BigInteger]$LoadStore_Cycles * [BigInteger]$LoadStore_Instructions
-        $Branch_Cycle_Count = [BigInteger]$Branch_Cycles * [BigInteger]$Branch_Instructions
-        $Total_Cycles = $ALU_Cycle_Count + $LoadStore_Cycle_Count + $Branch_Cycle_Count
-    } else {
-        # Use Decimal for calculations if possible
-        $Total_Cycles = $ALU_Cycle_Count + $LoadStore_Cycle_Count + $Branch_Cycle_Count
+# Function to get valid percentage input
+function Get-ValidPercentage {
+    param (
+        [string]$instructionType
+    )
+    while ($true) {
+        $input = Read-Host "Enter percentage for $instructionType instructions (0-100)"
+        $percentage = 0
+        if ([double]::TryParse($input, [ref]$percentage)) {
+            if ($percentage -ge 0 -and $percentage -le 100) {
+                return $percentage / 100
+            }
+        }
+        Write-Host "Please enter a valid percentage between 0 and 100"
     }
+}
 
-    # Calculate Average CPI using Decimal
-    $Average_CPI = $Total_Cycles / $Total_Instructions
+# Function to get valid cycle input
+function Get-ValidCycles {
+    param (
+        [string]$instructionType
+    )
+    while ($true) {
+        $input = Read-Host "Enter number of cycles for $instructionType instructions (1 or greater)"
+        $cycles = 0
+        if ([int]::TryParse($input, [ref]$cycles)) {
+            if ($cycles -ge 1) {
+                return $cycles
+            }
+        }
+        Write-Host "Please enter a valid number of cycles (1 or greater)"
+    }
+}
 
-    # Calculate total execution cycles for 1 million instructions
-    $Total_Execution_Cycles = 1000000 * $Average_CPI
+# Get instruction mix percentages from user
+Write-Host "`nEnter instruction mix percentages:"
+Write-Host "--------------------------------"
+$aluPercentage = Get-ValidPercentage "ALU"
+$loadStorePercentage = Get-ValidPercentage "Load/Store"
+$branchPercentage = Get-ValidPercentage "Branch"
 
-    # Calculate execution time at 2GHz clock rate
-    $Execution_Time_Seconds = $Total_Execution_Cycles / 2000000000
+# Validate total percentage
+$totalPercentage = $aluPercentage + $loadStorePercentage + $branchPercentage
+if ([math]::Round($totalPercentage, 3) -ne 1) {
+    Write-Host "`nError: Percentages must sum to 100%. Current sum: $([math]::Round($totalPercentage * 100, 1))%"
+    exit
+}
 
-    # Format execution time in milliseconds
-    $Execution_Time_Milliseconds = $Execution_Time_Seconds * 1000
+# Get cycles for each instruction type
+Write-Host "`nEnter cycles for each instruction type:"
+Write-Host "------------------------------------"
+$aluCycles = Get-ValidCycles "ALU"
+$loadStoreCycles = Get-ValidCycles "Load/Store"
+$branchCycles = Get-ValidCycles "Branch"
 
-    # Display results
-    Write-Host "Average CPI: $($Average_CPI)"
-    Write-Host "Total execution cycles for 1 million instructions: $($Total_Execution_Cycles)"
-    Write-Host "Execution time at 2GHz: $($Execution_Time_Milliseconds) milliseconds"
+# Input parameters
+$totalInstructions = 1000000
+$clockRate = 2e9  # 2GHz in Hz
 
-} catch {
-    Write-Warning "Error: Calculation resulted in an unexpected issue."
+# Create instruction mix dictionary
+$instructionMix = @{
+    'ALU' = @{
+        Percentage = $aluPercentage
+        Cycles = $aluCycles
+    }
+    'LoadStore' = @{
+        Percentage = $loadStorePercentage
+        Cycles = $loadStoreCycles
+    }
+    'Branch' = @{
+        Percentage = $branchPercentage
+        Cycles = $branchCycles
+    }
+}
+
+# Calculate average CPI using the new formula
+# (Cycle1/Instruction1% + Cycle2/Instruction2% + Cycle3/Instruction3%) / 3
+$averageCPI = 0
+foreach ($instruction in $instructionMix.Keys) {
+    if ($instructionMix[$instruction].Percentage -gt 0) {
+        $averageCPI += $instructionMix[$instruction].Cycles / $instructionMix[$instruction].Percentage
+    }
+}
+$averageCPI = $averageCPI / 3
+
+# Calculate total execution cycles
+$totalCycles = $totalInstructions * $averageCPI
+
+# Calculate execution time in seconds
+$executionTime = $totalCycles / $clockRate
+
+# Format results
+Write-Host "`nPerformance Analysis Results:"
+Write-Host "--------------------------"
+Write-Host "a) Average CPI: $([math]::Round($averageCPI, 2))"
+Write-Host "b) Total execution cycles: $([math]::Round($totalCycles, 0))"
+Write-Host "c) Execution time: $([math]::Round($executionTime * 1000, 2)) milliseconds"
+
+# Show detailed breakdown
+Write-Host "`nDetailed Instruction Breakdown:"
+Write-Host "--------------------------"
+foreach ($instruction in $instructionMix.Keys) {
+    $count = $totalInstructions * $instructionMix[$instruction].Percentage
+    $cycles = $count * $instructionMix[$instruction].Cycles
+    $individualCPI = if ($instructionMix[$instruction].Percentage -gt 0) {
+        $instructionMix[$instruction].Cycles / $instructionMix[$instruction].Percentage
+    } else {
+        0
+    }
+    Write-Host "$instruction Instructions:"
+    Write-Host "  Percentage: $([math]::Round($instructionMix[$instruction].Percentage * 100, 1))%"
+    Write-Host "  Cycles per instruction: $($instructionMix[$instruction].Cycles)"
+    Write-Host "  Individual CPI contribution: $([math]::Round($individualCPI, 2))"
+    Write-Host "  Count: $([math]::Round($count, 0))"
+    Write-Host "  Total Cycles: $([math]::Round($cycles, 0))`n"
 }
