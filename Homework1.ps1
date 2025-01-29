@@ -82,8 +82,7 @@ function Start-CPICalculator {
         $totalCycles = $totalInstructions * $averageCPI
         $clockSpeed = 2 # GHz
         $executionTime = $totalCycles / ($clockSpeed * 1E9) # seconds
-        $MIPS = $totalInstructions / ($executionTime * 1E6)
-        $MFLOPS = $MIPS # Assuming 1 floating point operation per instruction
+        $MFLOPS = $totalInstructions / ($executionTime * 1E6)
         
         # Display results
         Write-Host "`nResults:" -ForegroundColor Green
@@ -91,7 +90,6 @@ function Start-CPICalculator {
         Write-Host "Average CPI: $($averageCPI.ToString('F2'))"
         Write-Host "Total Cycles: $($totalCycles.ToString('N0'))"
         Write-Host "Execution Time: $($executionTime.ToString('E3')) seconds"
-        Write-Host "MIPS: $($MIPS.ToString('N2'))"
         Write-Host "MFLOPS: $($MFLOPS.ToString('N2'))"
     }
     catch {
