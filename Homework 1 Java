@@ -1,0 +1,163 @@
+import java.util.Scanner;
+
+public class CPICalculator {
+
+    // Function to test input values
+    public static boolean testInputValue(double value, String parameterName, double minValue, double maxValue) {
+        if (value < minValue || value > maxValue) {
+            throw new IllegalArgumentException("Invalid " + parameterName + ". Value must be between " + minValue + " and " + maxValue);
+        }
+        return true;
+    }
+
+    // Function to get input
+    public static double getValidatedInput(String prompt, double minValue, double maxValue) {
+        Scanner scanner = new Scanner(System.in);
+        double value;
+
+        while (true) {
+            try {
+                System.out.print(prompt);
+                value = Double.parseDouble(scanner.nextLine());
+                if (testInputValue(value, prompt, minValue, maxValue)) {
+                    return value;
+                }
+            } catch (Exception e) {
+                System.out.println("Please enter a valid number.");
+            }
+        }
+    }
+
+    // CPI Calculation function
+    public static void startCPICalculator() {
+        System.out.println("CPI Calculator");
+        System.out.println("===============");
+
+        try {
+            System.out.println("\nEnter instruction mix (percentages must sum to 100):");
+
+            // Get user input
+            double ALUPercentage = getValidatedInput("Enter percentage of ALU instructions (0-100): ", 0, 100);
+            double ALUCycles = getValidatedInput("Enter number of ALU instruction cycles: ", 1, Double.MAX_VALUE);
+
+            double LoadStorePercentage = getValidatedInput("Enter percentage of Load/Store instructions (0-100): ", 0, 100);
+            double LoadStoreCycles = getValidatedInput("Enter number of Load/Store cycles: ", 1, Double.MAX_VALUE);
+
+            double remainingPercentage = 100 - (ALUPercentage + LoadStorePercentage);
+            System.out.println("\nRemaining percentage for Branch instructions: " + remainingPercentage + "%");
+
+            if (remainingPercentage < 0) {
+                throw new IllegalArgumentException("Total percentage exceeds 100%");
+            }
+
+            double BranchCycles = getValidatedInput("Enter number of Branch cycles: ", 1, Double.MAX_VALUE);
+
+            // Calculate metrics
+            double ALUFraction = ALUPercentage / 100;
+            double LoadStoreFraction = LoadStorePercentage / 100;
+            double BranchFraction = remainingPercentage / 100;
+
+            // Calculate average CPI
+            double averageCPI = (ALUCycles / ALUFraction +
+                    LoadStoreCycles / LoadStoreFraction +
+                    BranchCycles / BranchFraction) / 3;
+
+            // Calculate metrics for 1 million instructions
+            double totalInstructions = 1000000;
+            double totalCycles = totalInstructions * averageCPI;
+            double clockSpeed = 2; // GHz
+            double executionTime = totalCycles / (clockSpeed * 1E9); // seconds
+            double MFLOPS = totalInstructions / (executionTime * 1E6);
+
+            // Display results
+            System.out.println("\nResults:");
+            System.out.println("========");
+            System.out.printf("Average CPI: %.2f\n", averageCPI);
+            System.out.printf("Total Cycles: %,d\n", (long) totalCycles);
+            System.out.printf("Execution Time: %.3e seconds\n", executionTime);
+            System.out.printf("MFLOPS: %.2f\n", MFLOPS);
+
+        } catch (Exception e) {
+            System.out.println("\nError: " + e.getMessage());
+        }
+    }
+
+    // Speedup Comparison Calculation function
+    public static void startSpeedupCalculator() {
+        System.out.println("Speedup Comparison Calculator");
+        System.out.println("===========================");
+
+        try {
+            System.out.println("\nMachine 1 Configuration:");
+            double clockSpeed1 = getValidatedInput("Enter Clock Speed (GHz): ", 0.1, Double.MAX_VALUE);
+            double CPI1 = getValidatedInput("Enter CPI: ", 0.1, Double.MAX_VALUE);
+
+            System.out.println("\nMachine 2 Configuration:");
+            double clockSpeed2 = getValidatedInput("Enter Clock Speed (GHz): ", 0.1, Double.MAX_VALUE);
+            double CPI2 = getValidatedInput("Enter CPI: ", 0.1, Double.MAX_VALUE);
+
+            // Calculate execution time for each machine
+            double executionTime1 = CPI1 / clockSpeed1;
+            double executionTime2 = CPI2 / clockSpeed2;
+
+            // Calculate speedup
+            double speedup = executionTime1 / executionTime2;
+
+            // Display results
+            System.out.println("\nResults:");
+            System.out.println("========");
+            System.out.printf("Machine 1 Execution Time: %.3e seconds per instruction\n", executionTime1);
+            System.out.printf("Machine 2 Execution Time: %.3e seconds per instruction\n", executionTime2);
+            System.out.printf("Speedup (Machine 2 vs Machine 1): %.2fx\n", speedup);
+
+            if (speedup > 1) {
+                System.out.printf("Machine 2 is faster by %.2f%%\n", (speedup - 1) * 100);
+            } else if (speedup < 1) {
+                System.out.printf("Machine 2 is slower by %.2f%%\n", (1 - speedup) * 100);
+            } else {
+                System.out.println("Both machines have the same performance.");
+            }
+        } catch (Exception e) {
+            System.out.println("\nError: " + e.getMessage());
+        }
+    }
+
+    // Main menu function
+    public static void showMainMenu() {
+        Scanner scanner = new Scanner(System.in);
+        while (true) {
+            System.out.println("CPU Performance Calculator");
+            System.out.println("=======================");
+            System.out.println("1. CPI Calculator");
+            System.out.println("2. Speedup Comparison");
+            System.out.println("3. Exit");
+
+            System.out.print("\nEnter your choice (1-3): ");
+            String choice = scanner.nextLine();
+
+            switch (choice) {
+                case "1":
+                    startCPICalculator();
+                    break;
+                case "2":
+                    startSpeedupCalculator();
+                    break;
+                case "3":
+                    System.out.println("Goodbye!");
+                    return;
+                default:
+                    System.out.println("Invalid choice. Please try again.");
+                    break;
+            }
+
+            System.out.println("\nPress Enter to continue...");
+            scanner.nextLine();  // Wait for the user to press Enter
+        }
+    }
+
+    // Main function to start the program
+    public static void main(String[] args) {
+        showMainMenu();
+    }
+
+}
